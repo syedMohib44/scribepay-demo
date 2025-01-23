@@ -23,6 +23,8 @@ export default function Home() {
     value: "",
     label: "",
   });
+
+  const [businessChain, setBusinessChain] = useState<any | null>(null); // Update type for better clarity
   const [error, setError] = useState<string>(""); // To store error message
   const currentTime = Math.floor(Date.now() / 1000);
   const timePlus3Minutes = currentTime + 3 * 60;
@@ -32,10 +34,18 @@ export default function Home() {
     if (ethereum) {
       const newProvider = new ethers.BrowserProvider(ethereum);
       setProvider(newProvider);
+      if (businessData && businessData.chains.length > 0 && provider) {
+        provider.getNetwork().then((network) => {
+          const mChain = businessData.chains.find(
+            (chain) => chain.chainId === Number(network.chainId)
+          );
+          setBusinessChain(mChain || null);
+        });
+
+      }
     }
   }, []);
 
-  console.log('========= ', apiKey)
   const providerConfig: ProviderConfig = {
     apiKey: apiKey,
     provider: provider
@@ -43,6 +53,21 @@ export default function Home() {
 
   const { businessData } = useInitializeSDK(providerConfig);
 
+
+  ethereum.on("chainChanged", async (chainId: string) => {
+    if (businessData && businessData.chains.length > 0) {
+      console.log("Chain changed to:", chainId);
+      const mChain = businessData.chains.find(
+        (chain) => chain.chainId === parseInt(chainId, 16)
+      );
+      setBusinessChain(mChain || null);
+      // Fetch updated network details
+      // const network = await newProvider.getNetwork();
+      // console.log("Updated Network:", network);
+    }
+  });
+
+  
   // Handle token selection change
   const handleTokenChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const { value, options } = event.target;
@@ -51,12 +76,19 @@ export default function Home() {
     setError(""); // Reset error when a new token is selected
   };
 
+  const handlePaymentSuccess = () => {
+    console.log("Payment was successful!");
+    // Perform any additional actions, such as navigation or showing a success message
+  };
+
   const { payNativeToken, currencyResData } = usePay({
     amount: "0.01",
     expectedDelivery: 11111111,
     fromCurrency: "USD",
     token: { value: selectedToken.value, label: selectedToken.label },
   });
+
+
 
   const { payERC20Token } = usePayErc20({
     amount: "1",
@@ -81,12 +113,13 @@ export default function Home() {
       </div>
       <div className="main-wrapper">
         <div className="container">
-          <h3>Integartion With ScribePay UI </h3>
+          <h3>Integartion With ScribePay UI</h3>
           <Payment
             amount="0.01"
             expectedDelivery={timePlus3Minutes}
             theme="dark"
             fromCurrency="USD"
+            onSuccess={handlePaymentSuccess}
           />
         </div>
         <div className="container">
@@ -114,14 +147,21 @@ export default function Home() {
                 className="select-token"
               >
                 <option value="">-- Select Token --</option>
-                {!!businessData &&
-                  businessData.chains[0].supportedTokens.map(
+                {businessChain?.supportedTokens.map(
+                  (item: { tokenName: string; tokenAddress: string }) => (
+                    <option key={item.tokenAddress} value={item.tokenAddress}>
+                      {item.tokenName}
+                    </option>
+                  )
+                )}
+                {/* {(businessChain) ?
+                  businessChain.supportedTokens.map(
                     (item: { tokenName: string; tokenAddress: string }) => (
                       <option value={item.tokenAddress} label={item.tokenName}>
                         {item.tokenName}
                       </option>
                     )
-                  )}
+                  ) : {}} */}
               </select>
             </div>
 
